@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gunshot Detection Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+</head>
+<body>
+  <header>
+    <h1>Gunshot Detection Dashboard</h1>
+    <p>LoRaWAN + TTN + XIAO nRF52</p>
+  </header>
+
+  <main>
+    <section class="stats-grid">
+      <div class="card">
+        <h3>Total detections</h3>
+        <p id="totalDetections">0</p>
+      </div>
+      <div class="card">
+        <h3>Gunshot label count</h3>
+        <p id="gunshotDetections">0</p>
+      </div>
+      <div class="card">
+        <h3>Average confidence</h3>
+        <p id="avgConfidence">0</p>
+      </div>
+      <div class="card">
+        <h3>Average peak</h3>
+        <p id="avgPeak">0</p>
+      </div>
+    </section>
+
+    <section class="layout">
+      <div class="card map-card">
+        <h2>Detection map</h2>
+        <div id="map"></div>
+      </div>
+
+      <div class="card side-card">
+        <h2>Recent detections</h2>
+        <div id="eventList" class="event-list"></div>
+      </div>
+    </section>
+
+    <section class="layout">
+      <div class="card">
+        <h2>Detections by node</h2>
+        <ul id="byNodeList"></ul>
+      </div>
+
+      <div class="card">
+        <h2>Detections by day</h2>
+        <ul id="byDayList"></ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Testing</h2>
+      <button id="sendTestBtn">Send fake detection</button>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
