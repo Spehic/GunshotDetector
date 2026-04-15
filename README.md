@@ -29,7 +29,10 @@ Sensor → LoRa → TTN → Webhook → Backend → Database → Frontend
 cd server
 npm install
 npm start
+```
 
-cd ../frontend
+### Frontend
+```bash
+cd frontend
 python -m http.server 8080
 ```
