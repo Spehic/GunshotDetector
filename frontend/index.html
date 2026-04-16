@@ -4,6 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gunshot Detection Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="style.css" />
   <link
     rel="stylesheet"
@@ -11,12 +17,70 @@
   />
 </head>
 <body>
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+
   <header>
-    <h1>Gunshot Detection Dashboard</h1>
+    <h1>Gunshot Detection Command Center</h1>
     <p>LoRaWAN + TTN + XIAO nRF52</p>
   </header>
 
   <main>
+    <section id="webhookAlert" class="webhook-alert" aria-live="assertive" aria-atomic="true">
+      <div class="webhook-alert-content">
+        <span id="webhookAlertText"></span>
+        <button id="alertSeeMapBtn" class="alert-see-map-btn" type="button">See on map</button>
+      </div>
+    </section>
+
+    <section class="card chart-card">
+      <div class="chart-topbar">
+        <div>
+          <h2>Gunshot Trend Timeline</h2>
+          <p class="muted">View detections by day, week, month, or year</p>
+        </div>
+
+        <div class="timeline-controls">
+          <label for="timelineGranularity">Timeline</label>
+          <select id="timelineGranularity">
+            <option value="day">Day</option>
+            <option value="week">Week</option>
+            <option value="month" selected>Month</option>
+            <option value="year">Year</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="chart-grid">
+        <div class="chart-panel">
+          <h3>Gunshot detections over time</h3>
+          <canvas id="timelineChart" aria-label="Timeline chart" role="img"></canvas>
+        </div>
+        <div class="chart-panel">
+          <h3>Top nodes (filtered by timeline)</h3>
+          <canvas id="nodeChart" aria-label="Node chart" role="img"></canvas>
+        </div>
+        <div class="chart-panel chart-panel-wide">
+          <h3>Detected shots timeline (time scatter + confidence trend)</h3>
+          <p class="muted">Each bubble is one shot event at its exact timestamp; bubble size reflects peak and the line shows confidence trend.</p>
+          <canvas id="shotTimelineChart" aria-label="Detected shots timeline chart" role="img"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="layout">
+      <div class="card map-card">
+        <h2>Detection map</h2>
+        <div id="map"></div>
+      </div>
+
+      <div class="card side-card">
+        <h2>Recent detections</h2>
+        <p class="muted">Click any detection to focus and highlight it on the map.</p>
+        <div id="eventList" class="event-list"></div>
+      </div>
+    </section>
+
     <section class="stats-grid">
       <div class="card">
         <h3>Total detections</h3>
@@ -33,18 +97,6 @@
       <div class="card">
         <h3>Average peak</h3>
         <p id="avgPeak">0</p>
-      </div>
-    </section>
-
-    <section class="layout">
-      <div class="card map-card">
-        <h2>Detection map</h2>
-        <div id="map"></div>
-      </div>
-
-      <div class="card side-card">
-        <h2>Recent detections</h2>
-        <div id="eventList" class="event-list"></div>
       </div>
     </section>
 
@@ -67,6 +119,7 @@
   </main>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
