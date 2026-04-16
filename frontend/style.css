@@ -252,8 +252,64 @@ main {
 
 .map-controls {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-bottom: 10px;
+}
+
+.map-window-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.map-window-btn {
+  background: rgba(26, 109, 90, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(26, 109, 90, 0.35);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.map-window-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+[data-theme="dark"] .map-window-btn {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: var(--ink-700);
+}
+
+[data-theme="dark"] .map-window-btn.active {
+  background: #0ea5a4;
+  border-color: #0ea5a4;
+  color: #052023;
+}
+
+.map-window-btn:hover {
+  transform: translateY(-1px);
+}
+
+.map-window-btn:focus-visible {
+  outline: 2px solid rgba(223, 95, 45, 0.5);
+  outline-offset: 2px;
+}
+
+#toggleMapHeatmap {
+  margin-left: auto;
+}
+
+@media (max-width: 900px) {
+  #toggleMapHeatmap {
+    margin-left: 0;
+  }
 }
 
 #map {

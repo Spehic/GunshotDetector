@@ -8,9 +8,11 @@ let selectedHalo;
 let mapHeatLayer;
 let selectedEventKey = null;
 let hasAutoFitted = false;
+let mapWindowMinutes = 60;
 
 let allEvents = [];
 let markerByKey = new Map();
+let eventByKey = new Map();
 
 let timelineChart;
 let nodeChart;
@@ -35,6 +37,7 @@ const exportPdfBtn = document.getElementById("exportPdfBtn");
 const exportCsvBtn = document.getElementById("exportCsvBtn");
 const liveCounterDisplay = document.getElementById("liveCounter");
 const toggleMapHeatmapBtn = document.getElementById("toggleMapHeatmap");
+const mapWindowButtons = Array.from(document.querySelectorAll(".map-window-btn"));
 
 const shotAxisFormatter = new Intl.DateTimeFormat(undefined, {
   month: "short",
@@ -195,7 +198,6 @@ function updateMapHeatmap(events) {
   }
 
   const heatPoints = events
-    .filter((event) => String(event.label || "").toLowerCase().includes("gunshot"))
     .map((event) => {
       const lat = Number(event.latitude);
       const lng = Number(event.longitude);
@@ -242,6 +244,34 @@ function updateThemeToggleIcon(theme) {
   if (themeToggle) {
     themeToggle.textContent = theme === "dark" ? "☀️" : "🌙";
   }
+}
+
+function toEventTimestamp(event) {
+  const value = new Date(event.received_at).getTime();
+  return Number.isNaN(value) ? null : value;
+}
+
+function isEventInMapWindow(event) {
+  if (mapWindowMinutes === null) {
+    return true;
+  }
+
+  const eventTs = toEventTimestamp(event);
+  if (eventTs === null) {
+    return false;
+  }
+
+  const cutoffTs = Date.now() - (mapWindowMinutes * 60 * 1000);
+  return eventTs >= cutoffTs;
+}
+
+function updateMapWindowButtonsActiveState() {
+  mapWindowButtons.forEach((button) => {
+    const value = button.dataset.window;
+    const isActive = (value === "all" && mapWindowMinutes === null)
+      || (value !== "all" && Number(value) === mapWindowMinutes);
+    button.classList.toggle("active", isActive);
+  });
 }
 
 function toDisplayLabel(label) {
@@ -448,10 +478,10 @@ function createChartsIfNeeded() {
             pointBorderColor: palette.shotPointBorder,
             pointBorderWidth: 1.4,
             pointRadius(context) {
-              return context.raw?.r || 4;
+              return context.raw?.r || 2.6;
             },
             pointHoverRadius(context) {
-              return (context.raw?.r || 4) + 2;
+              return (context.raw?.r || 2.6) + 1.2;
             },
             fill: false,
             showLine: false
@@ -693,7 +723,7 @@ function renderTimelineVisuals() {
       return {
         x: timeValue,
         y: confidence,
-        r: 4 + Math.min(7, Math.max(0, peak * 8)),
+        r: 2 + Math.min(3, Math.max(0, peak * 3.2)),
         peak,
         node: event.node_id || "unknown-node"
       };
@@ -825,13 +855,53 @@ function focusEventByKey(eventKey, zoomToLocation = true) {
   }
 
   const marker = markerByKey.get(eventKey);
-  if (!marker) {
+  const fallbackEvent = eventByKey.get(eventKey);
+  if (!marker && !fallbackEvent) {
     clearSelectedEvent();
     return;
   }
 
   selectedEventKey = eventKey;
   selectionLayer.clearLayers();
+
+  if (!marker && fallbackEvent) {
+    const lat = Number(fallbackEvent.latitude);
+    const lng = Number(fallbackEvent.longitude);
+    if (Number.isNaN(lat) || Number.isNaN(lng) || lat === 0 || lng === 0) {
+      clearSelectedEvent();
+      return;
+    }
+
+    const latLng = L.latLng(lat, lng);
+    if (zoomToLocation) {
+      map.flyTo(latLng, Math.max(map.getZoom(), 16), {
+        duration: 0.8
+      });
+    }
+
+    selectedHalo = L.circleMarker(latLng, {
+      radius: 16,
+      color: "#ff5a36",
+      weight: 3,
+      fillColor: "#ffd4c6",
+      fillOpacity: 0.45,
+      interactive: false
+    }).addTo(selectionLayer);
+
+    const fallbackMarker = L.marker(latLng).addTo(selectionLayer);
+    const isOutsideWindow = !isEventInMapWindow(fallbackEvent);
+    fallbackMarker.bindPopup(`
+      <b>${toDisplayLabel(fallbackEvent.label)}</b><br/>
+      Node: ${fallbackEvent.node_id || "unknown-node"}<br/>
+      Time: ${new Date(fallbackEvent.received_at).toLocaleString()}<br/>
+      Confidence: ${Number(fallbackEvent.confidence || 0).toFixed(2)}<br/>
+      Peak: ${Number(fallbackEvent.peak || 0).toFixed(2)}
+      ${isOutsideWindow ? "<br/><i>Outside active map window</i>" : ""}
+    `);
+    fallbackMarker.openPopup();
+    setSelectedEventVisualState(eventKey);
+    return;
+  }
 
   const latLng = marker.getLatLng();
 
@@ -910,6 +980,7 @@ async function fetchEvents() {
   eventList.innerHTML = "";
   markersLayer.clearLayers();
   markerByKey = new Map();
+  eventByKey = new Map();
 
   const bounds = [];
 
@@ -947,7 +1018,10 @@ async function fetchEvents() {
 
     eventList.appendChild(item);
 
-    if (!Number.isNaN(lat) && !Number.isNaN(lng) && lat !== 0 && lng !== 0) {
+    eventByKey.set(eventKey, event);
+
+    const shouldRenderOnMap = isEventInMapWindow(event) || eventKey === selectedEventKey;
+    if (shouldRenderOnMap && !Number.isNaN(lat) && !Number.isNaN(lng) && lat !== 0 && lng !== 0) {
       const marker = L.marker([lat, lng]).addTo(markersLayer);
       marker.bindPopup(`
         <b>${label}</b><br/>
@@ -974,6 +1048,9 @@ async function fetchEvents() {
   if (selectedEventKey && markerByKey.has(selectedEventKey)) {
     focusEventByKey(selectedEventKey, false);
   }
+  else if (selectedEventKey && eventByKey.has(selectedEventKey)) {
+    focusEventByKey(selectedEventKey, false);
+  }
   else {
     clearSelectedEvent();
   }
@@ -982,6 +1059,8 @@ async function fetchEvents() {
 }
 
 async function sendFakeDetection() {
+  const randomConfidence = Number((0.55 + Math.random() * 0.44).toFixed(2));
+
   await fetch(`${API_BASE}/api/test-event`, {
     method: "POST",
     headers: {
@@ -990,7 +1069,7 @@ async function sendFakeDetection() {
     body: JSON.stringify({
       node_id: "xiao-1",
       label: "gunshot",
-      confidence: 0.93,
+      confidence: randomConfidence,
       peak: 0.81,
       latitude: 46.0569 + (Math.random() - 0.5) * 0.01,
       longitude: 14.5058 + (Math.random() - 0.5) * 0.01
@@ -1118,6 +1197,17 @@ if (toggleMapHeatmapBtn) {
   });
 }
 
+mapWindowButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const value = button.dataset.window;
+    mapWindowMinutes = value === "all" ? null : Number(value);
+    updateMapWindowButtonsActiveState();
+    fetchEvents().catch((error) => {
+      console.error("Failed to refresh map with new window:", error);
+    });
+  });
+});
+
 if (alertSeeMapBtn) {
   alertSeeMapBtn.addEventListener("click", () => {
     if (!lastAlertEventKey) {
@@ -1130,6 +1220,7 @@ if (alertSeeMapBtn) {
 }
 
 initThemeToggle();
+updateMapWindowButtonsActiveState();
 initMap();
 refreshAll();
 applyChartTheme();

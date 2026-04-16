@@ -85,6 +85,13 @@
       <div class="card map-card">
         <h2>Detection map</h2>
         <div class="map-controls">
+          <div class="map-window-controls" role="group" aria-label="Map time window">
+            <button class="map-window-btn" data-window="15" type="button">15m</button>
+            <button class="map-window-btn active" data-window="60" type="button">1h</button>
+            <button class="map-window-btn" data-window="360" type="button">6h</button>
+            <button class="map-window-btn" data-window="1440" type="button">24h</button>
+            <button class="map-window-btn" data-window="all" type="button">All</button>
+          </div>
           <button id="toggleMapHeatmap" class="chart-toggle-btn active" type="button">Hide map heatmap</button>
         </div>
         <div id="map"></div>
