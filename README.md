@@ -62,8 +62,7 @@ npm install
 npm start
 ```
 
-Runs on: http://localhost:8000
-
+Runs on: https://backend.kbnet.si
 ------------------------------------------------------------------------
 
 ### 🌐 Frontend
