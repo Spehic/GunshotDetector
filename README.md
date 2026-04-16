@@ -36,18 +36,18 @@ Sensor → LoRa → TTN → Webhook → Backend → Database → Frontend
 
 ## ✨ Features
 
--   Real-time event ingestion via webhook\
--   ML-based gunshot detection (Edge Impulse)\
--   Map visualization (Leaflet)\
--   Detection statistics dashboard\
+-   Real-time event ingestion via webhook
+-   ML-based gunshot detection (Edge Impulse)
+-   Map visualization (Leaflet)
+-   Detection statistics dashboard
 -   Multi-node sensor support
 
 ------------------------------------------------------------------------
 
 ## ⚠️ Limitations
 
--   Detects gunshot-like events, not guaranteed real gunshots\
--   Displays sensor location, not actual source location\
+-   Detects gunshot-like events, not guaranteed real gunshots
+-   Displays sensor location, not actual source location
 -   No triangulation
 
 ------------------------------------------------------------------------
