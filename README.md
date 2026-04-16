@@ -70,7 +70,7 @@ Runs on: https://backend.kbnet.si
 
 ``` bash
 cd frontend
-python -m http.server 8080
+python3 -m http.server 8080
 ```
 
 Open in browser: https://mis.kbnet.si
