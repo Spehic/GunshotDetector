@@ -11,11 +11,11 @@ visualization.
 
 ### 🧰 Technologies Used
 
--   XIAO nRF52 microcontroller\
--   Edge Impulse (ML model)\
--   LoRaWAN + The Things Network (TTN)\
--   Node.js (Express backend)\
--   SQLite database\
+-   XIAO nRF52 microcontroller
+-   Edge Impulse (ML model)
+-   LoRaWAN + The Things Network (TTN)
+-   Node.js (Express backend)
+-   SQLite database
 -   Web dashboard (Leaflet map)
 
 ------------------------------------------------------------------------
@@ -26,10 +26,10 @@ Sensor → LoRa → TTN → Webhook → Backend → Database → Frontend
 
 ### Flow
 
-1.  Sensor detects sound and runs ML classification\
-2.  Data is sent via LoRaWAN to TTN\
-3.  TTN triggers webhook\
-4.  Backend stores event in SQLite database\
+1.  Sensor detects sound and runs ML classification
+2.  Data is sent via LoRaWAN to TTN
+3.  TTN triggers webhook
+4.  Backend stores event in SQLite database
 5.  Frontend fetches and visualizes data
 
 ------------------------------------------------------------------------
@@ -86,9 +86,9 @@ Network (TTN)** and stores it in a SQLite database.
 
 ### Features
 
--   Receiving webhook events\
--   Fetching detection history\
--   Viewing aggregated statistics\
+-   Receiving webhook events
+-   Fetching detection history
+-   Viewing aggregated statistics
 -   Inserting test data
 
 Designed for real-time monitoring and analysis of acoustic gunshot
@@ -110,14 +110,14 @@ Returns a list of recent detection events stored in the database.
 
 ### Behavior
 
--   Results are ordered by newest first\
--   Includes full event data including signal metrics and location\
+-   Results are ordered by newest first
+-   Includes full event data including signal metrics and location
 -   Raw payload is returned as a JSON string
 
 ### Use Cases
 
--   Dashboard display\
--   Debugging incoming data\
+-   Dashboard display
+-   Debugging incoming data
 -   Map visualization
 
 ------------------------------------------------------------------------
@@ -130,20 +130,20 @@ Returns aggregated statistics about detection events.
 
 ### Includes
 
--   totalDetections\
--   avgConfidence\
--   avgPeak\
+-   totalDetections
+-   avgConfidence
+-   avgPeak
 -   gunshotDetections
 
 ### Breakdowns
 
--   byNode (detections per sensor)\
+-   byNode (detections per sensor)
 -   byDay (last 7 days)
 
 ### Use Cases
 
--   Analytics dashboards\
--   System monitoring\
+-   Analytics dashboards
+-   System monitoring
 -   Trend analysis
 
 ------------------------------------------------------------------------
@@ -156,8 +156,8 @@ Creates a test detection event manually without TTN.
 
 ### Use Cases
 
--   Backend testing\
--   Demo data\
+-   Backend testing
+-   Demo data
 -   Development
 
 ### Request Body
@@ -175,17 +175,17 @@ Creates a test detection event manually without TTN.
 
 ### Defaults
 
--   node_id: "test-node"\
--   label: "gunshot"\
--   confidence: 0.95\
--   peak: 0.87\
--   latitude: 46.0569\
+-   node_id: "test-node"
+-   label: "gunshot"
+-   confidence: 0.95
+-   peak: 0.87
+-   latitude: 46.0569
 -   longitude: 14.5058
 
 ### Notes
 
--   RSSI and SNR set to 0\
--   Payload stored as-is\
+-   RSSI and SNR set to 0
+-   Payload stored as-is
 -   Timestamp auto-generated
 
 ------------------------------------------------------------------------
@@ -198,11 +198,11 @@ Receives uplink messages from TTN and stores them as detection events.
 
 ### Extracted Fields
 
--   node_id\
--   label\
--   confidence\
--   peak\
--   latitude, longitude\
+-   node_id
+-   label
+-   confidence
+-   peak
+-   latitude, longitude
 -   gateway RSSI, SNR
 
 ### Example Payload
@@ -220,9 +220,9 @@ Receives uplink messages from TTN and stores them as detection events.
 
 ### Notes
 
--   Missing fields default safely\
--   Full payload stored\
--   Timestamp generated automatically\
+-   Missing fields default safely
+-   Full payload stored
+-   Timestamp generated automatically
 -   Intended for TTN webhook use
 
 ------------------------------------------------------------------------
@@ -231,14 +231,14 @@ Receives uplink messages from TTN and stores them as detection events.
 
 Table: detections
 
--   id\
--   received_at\
--   node_id\
--   label\
--   confidence\
--   peak\
--   latitude\
--   longitude\
--   gateway_rssi\
--   gateway_snr\
+-   id
+-   received_at
+-   node_id
+-   label
+-   confidence
+-   peak
+-   latitude
+-   longitude
+-   gateway_rssi
+-   gateway_snr
 -   raw_payload
