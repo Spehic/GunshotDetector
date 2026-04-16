@@ -5,6 +5,7 @@ let map;
 let markersLayer;
 let selectionLayer;
 let selectedHalo;
+let mapHeatLayer;
 let selectedEventKey = null;
 let hasAutoFitted = false;
 
@@ -14,16 +15,26 @@ let markerByKey = new Map();
 let timelineChart;
 let nodeChart;
 let shotTimelineChart;
+let hourlyHeatmapChart;
+let showHourlyHeatmap = false;
 
 let lastSeenEventTime = 0;
 let lastSeenEventSignature = null;
 let lastAlertEventKey = null;
 let alertHideTimeout;
+let liveDetectionCount = 0;
+let showMapHeatmap = true;
 
 const timelineGranularitySelect = document.getElementById("timelineGranularity");
 const webhookAlert = document.getElementById("webhookAlert");
 const webhookAlertText = document.getElementById("webhookAlertText");
 const alertSeeMapBtn = document.getElementById("alertSeeMapBtn");
+const themeToggle = document.getElementById("themeToggle");
+const toggleHourlyHeatmap = document.getElementById("toggleHourlyHeatmap");
+const exportPdfBtn = document.getElementById("exportPdfBtn");
+const exportCsvBtn = document.getElementById("exportCsvBtn");
+const liveCounterDisplay = document.getElementById("liveCounter");
+const toggleMapHeatmapBtn = document.getElementById("toggleMapHeatmap");
 
 const shotAxisFormatter = new Intl.DateTimeFormat(undefined, {
   month: "short",
@@ -31,6 +42,124 @@ const shotAxisFormatter = new Intl.DateTimeFormat(undefined, {
   hour: "2-digit",
   minute: "2-digit"
 });
+
+const chartThemePlugin = {
+  id: "chartThemePlugin",
+  beforeDraw(chart, _args, opts) {
+    const { ctx, chartArea } = chart;
+    if (!chartArea || !opts?.backgroundColor) {
+      return;
+    }
+
+    ctx.save();
+    ctx.fillStyle = opts.backgroundColor;
+    ctx.fillRect(
+      chartArea.left,
+      chartArea.top,
+      chartArea.right - chartArea.left,
+      chartArea.bottom - chartArea.top
+    );
+    ctx.restore();
+  }
+};
+
+if (typeof Chart !== "undefined") {
+  Chart.register(chartThemePlugin);
+}
+
+function getChartThemePalette() {
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+
+  if (isDark) {
+    return {
+      text: "#e2e8f0",
+      gridStrong: "rgba(148, 163, 184, 0.2)",
+      gridSoft: "rgba(148, 163, 184, 0.12)",
+      chartBg: "rgba(15, 23, 42, 0.5)",
+      timelineLine: "#fb923c",
+      timelineFill: "rgba(251, 146, 60, 0.2)",
+      nodeFill: "rgba(45, 212, 191, 0.72)",
+      nodeBorder: "#2dd4bf",
+      shotPointFill: "rgba(251, 146, 60, 0.75)",
+      shotPointBorder: "#fb923c",
+      trendLine: "rgba(52, 211, 153, 0.95)",
+      heatmapFill: "rgba(251, 146, 60, 0.55)",
+      heatmapBorder: "#fb923c"
+    };
+  }
+
+  return {
+    text: "#425346",
+    gridStrong: "rgba(39, 59, 43, 0.1)",
+    gridSoft: "rgba(39, 59, 43, 0.06)",
+    chartBg: "rgba(255, 255, 255, 0.55)",
+    timelineLine: "#df5f2d",
+    timelineFill: "rgba(223, 95, 45, 0.2)",
+    nodeFill: "rgba(26, 109, 90, 0.8)",
+    nodeBorder: "#1a6d5a",
+    shotPointFill: "rgba(223, 95, 45, 0.75)",
+    shotPointBorder: "#df5f2d",
+    trendLine: "rgba(26, 109, 90, 0.95)",
+    heatmapFill: "rgba(223, 95, 45, 0.6)",
+    heatmapBorder: "#df5f2d"
+  };
+}
+
+function applyChartTheme() {
+  const palette = getChartThemePalette();
+
+  if (timelineChart) {
+    timelineChart.data.datasets[0].borderColor = palette.timelineLine;
+    timelineChart.data.datasets[0].backgroundColor = palette.timelineFill;
+    timelineChart.options.plugins.chartThemePlugin = { backgroundColor: palette.chartBg };
+    timelineChart.options.scales.y.grid.color = palette.gridStrong;
+    timelineChart.options.scales.x.grid.color = palette.gridSoft;
+    timelineChart.options.scales.y.ticks.color = palette.text;
+    timelineChart.options.scales.x.ticks.color = palette.text;
+    timelineChart.update("none");
+  }
+
+  if (nodeChart) {
+    nodeChart.data.datasets[0].backgroundColor = palette.nodeFill;
+    nodeChart.data.datasets[0].borderColor = palette.nodeBorder;
+    nodeChart.options.plugins.chartThemePlugin = { backgroundColor: palette.chartBg };
+    nodeChart.options.scales.x.grid.color = palette.gridStrong;
+    nodeChart.options.scales.x.ticks.color = palette.text;
+    nodeChart.options.scales.y.ticks.color = palette.text;
+    nodeChart.update("none");
+  }
+
+  if (shotTimelineChart) {
+    shotTimelineChart.data.datasets[0].pointBackgroundColor = palette.shotPointFill;
+    shotTimelineChart.data.datasets[0].pointBorderColor = palette.shotPointBorder;
+    shotTimelineChart.data.datasets[1].borderColor = palette.trendLine;
+    shotTimelineChart.data.datasets[1].backgroundColor = "rgba(26, 109, 90, 0.2)";
+    shotTimelineChart.options.plugins.chartThemePlugin = { backgroundColor: palette.chartBg };
+    shotTimelineChart.options.plugins.legend.labels.color = palette.text;
+    shotTimelineChart.options.scales.y.grid.color = palette.gridStrong;
+    shotTimelineChart.options.scales.x.grid.color = palette.gridSoft;
+    shotTimelineChart.options.scales.y.ticks.color = palette.text;
+    shotTimelineChart.options.scales.x.ticks.color = palette.text;
+    shotTimelineChart.options.scales.y.title.color = palette.text;
+    shotTimelineChart.options.scales.x.title.color = palette.text;
+    shotTimelineChart.update("none");
+  }
+
+  if (hourlyHeatmapChart) {
+    if (hourlyHeatmapChart.data.datasets[0]) {
+      hourlyHeatmapChart.data.datasets[0].backgroundColor = palette.heatmapFill;
+      hourlyHeatmapChart.data.datasets[0].borderColor = palette.heatmapBorder;
+    }
+    hourlyHeatmapChart.options.plugins.chartThemePlugin = { backgroundColor: palette.chartBg };
+    hourlyHeatmapChart.options.scales.y.ticks.color = palette.text;
+    hourlyHeatmapChart.options.scales.x.ticks.color = palette.text;
+    hourlyHeatmapChart.options.scales.y.title.color = palette.text;
+    hourlyHeatmapChart.options.scales.x.title.color = palette.text;
+    hourlyHeatmapChart.options.scales.y.grid.color = palette.gridStrong;
+    hourlyHeatmapChart.options.scales.x.grid.color = palette.gridSoft;
+    hourlyHeatmapChart.update("none");
+  }
+}
 
 function initMap() {
   map = L.map("map").setView([46.0569, 14.5058], 13); // Ljubljana example
@@ -43,11 +172,90 @@ function initMap() {
   markersLayer = L.layerGroup().addTo(map);
   selectionLayer = L.layerGroup().addTo(map);
 
+  if (typeof L.heatLayer === "function") {
+    mapHeatLayer = L.heatLayer([], {
+      radius: 26,
+      blur: 20,
+      maxZoom: 17,
+      gradient: {
+        0.2: "#1a6d5a",
+        0.45: "#22c55e",
+        0.7: "#f59e0b",
+        1.0: "#ef4444"
+      }
+    }).addTo(map);
+  }
+
   map.on("click", clearSelectedEvent);
+}
+
+function updateMapHeatmap(events) {
+  if (!map || !mapHeatLayer) {
+    return;
+  }
+
+  const heatPoints = events
+    .filter((event) => String(event.label || "").toLowerCase().includes("gunshot"))
+    .map((event) => {
+      const lat = Number(event.latitude);
+      const lng = Number(event.longitude);
+      const confidence = Number(event.confidence || 0);
+      if (Number.isNaN(lat) || Number.isNaN(lng) || lat === 0 || lng === 0) {
+        return null;
+      }
+
+      const weight = Math.min(1, Math.max(0.1, confidence || 0.1));
+      return [lat, lng, weight];
+    })
+    .filter(Boolean);
+
+  mapHeatLayer.setLatLngs(heatPoints);
+
+  if (showMapHeatmap) {
+    if (!map.hasLayer(mapHeatLayer)) {
+      map.addLayer(mapHeatLayer);
+    }
+  }
+  else if (map.hasLayer(mapHeatLayer)) {
+    map.removeLayer(mapHeatLayer);
+  }
+}
+
+function initThemeToggle() {
+  const savedTheme = localStorage.getItem("theme") || "light";
+  document.documentElement.setAttribute("data-theme", savedTheme);
+  updateThemeToggleIcon(savedTheme);
+
+  if (themeToggle) {
+    themeToggle.addEventListener("click", () => {
+      const currentTheme = document.documentElement.getAttribute("data-theme") || "light";
+      const newTheme = currentTheme === "light" ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", newTheme);
+      localStorage.setItem("theme", newTheme);
+      updateThemeToggleIcon(newTheme);
+      applyChartTheme();
+    });
+  }
+}
+
+function updateThemeToggleIcon(theme) {
+  if (themeToggle) {
+    themeToggle.textContent = theme === "dark" ? "☀️" : "🌙";
+  }
 }
 
 function toDisplayLabel(label) {
   return String(label || "unknown").trim() || "unknown";
+}
+
+function getThreatLevel(confidence) {
+  if (confidence >= 0.85) {
+    return "threat-red";
+  }
+  if (confidence >= 0.7) {
+    return "threat-yellow";
+  }
+  return "threat-green";
 }
 
 function buildEventKey(event, index) {
@@ -115,6 +323,7 @@ function parseBucketToSortableDate(bucket, granularity) {
 }
 
 function createChartsIfNeeded() {
+  const palette = getChartThemePalette();
   const timelineCanvas = document.getElementById("timelineChart");
   const nodeCanvas = document.getElementById("nodeChart");
   const shotTimelineCanvas = document.getElementById("shotTimelineChart");
@@ -128,8 +337,8 @@ function createChartsIfNeeded() {
           {
             label: "Gunshot detections",
             data: [],
-            borderColor: "#df5f2d",
-            backgroundColor: "rgba(223, 95, 45, 0.20)",
+            borderColor: palette.timelineLine,
+            backgroundColor: palette.timelineFill,
             fill: true,
             tension: 0.25,
             borderWidth: 3,
@@ -143,6 +352,9 @@ function createChartsIfNeeded() {
         maintainAspectRatio: false,
         animation: false,
         plugins: {
+          chartThemePlugin: {
+            backgroundColor: palette.chartBg
+          },
           legend: {
             display: false
           }
@@ -151,15 +363,19 @@ function createChartsIfNeeded() {
           y: {
             beginAtZero: true,
             ticks: {
-              precision: 0
+              precision: 0,
+              color: palette.text
             },
             grid: {
-              color: "rgba(39, 59, 43, 0.1)"
+              color: palette.gridStrong
             }
           },
           x: {
+            ticks: {
+              color: palette.text
+            },
             grid: {
-              color: "rgba(39, 59, 43, 0.06)"
+              color: palette.gridSoft
             }
           }
         }
@@ -176,8 +392,8 @@ function createChartsIfNeeded() {
           {
             label: "Detections",
             data: [],
-            backgroundColor: "rgba(26, 109, 90, 0.80)",
-            borderColor: "#1a6d5a",
+            backgroundColor: palette.nodeFill,
+            borderColor: palette.nodeBorder,
             borderWidth: 1.5,
             borderRadius: 8
           }
@@ -189,6 +405,9 @@ function createChartsIfNeeded() {
         animation: false,
         indexAxis: "y",
         plugins: {
+          chartThemePlugin: {
+            backgroundColor: palette.chartBg
+          },
           legend: {
             display: false
           }
@@ -197,13 +416,17 @@ function createChartsIfNeeded() {
           x: {
             beginAtZero: true,
             ticks: {
-              precision: 0
+              precision: 0,
+              color: palette.text
             },
             grid: {
-              color: "rgba(39, 59, 43, 0.1)"
+              color: palette.gridStrong
             }
           },
           y: {
+            ticks: {
+              color: palette.text
+            },
             grid: {
               display: false
             }
@@ -221,8 +444,8 @@ function createChartsIfNeeded() {
           {
             label: "Detected shots",
             data: [],
-            pointBackgroundColor: "rgba(223, 95, 45, 0.75)",
-            pointBorderColor: "#df5f2d",
+            pointBackgroundColor: palette.shotPointFill,
+            pointBorderColor: palette.shotPointBorder,
             pointBorderWidth: 1.4,
             pointRadius(context) {
               return context.raw?.r || 4;
@@ -237,7 +460,7 @@ function createChartsIfNeeded() {
             label: "Confidence trend",
             type: "line",
             data: [],
-            borderColor: "rgba(26, 109, 90, 0.95)",
+            borderColor: palette.trendLine,
             backgroundColor: "rgba(26, 109, 90, 0.2)",
             borderWidth: 2,
             tension: 0.25,
@@ -251,12 +474,15 @@ function createChartsIfNeeded() {
         maintainAspectRatio: false,
         animation: false,
         plugins: {
+          chartThemePlugin: {
+            backgroundColor: palette.chartBg
+          },
           legend: {
             display: true,
             labels: {
               usePointStyle: true,
               boxWidth: 8,
-              color: "#425346"
+              color: palette.text
             }
           },
           tooltip: {
@@ -284,28 +510,34 @@ function createChartsIfNeeded() {
             beginAtZero: true,
             max: 1,
             grid: {
-              color: "rgba(39, 59, 43, 0.1)"
+              color: palette.gridStrong
+            },
+            ticks: {
+              color: palette.text
             },
             title: {
               display: true,
-              text: "Confidence"
+              text: "Confidence",
+              color: palette.text
             }
           },
           x: {
             type: "linear",
             grid: {
-              color: "rgba(39, 59, 43, 0.06)"
+              color: palette.gridSoft
             },
             ticks: {
               autoSkip: true,
               maxTicksLimit: 8,
+              color: palette.text,
               callback(value) {
                 return shotAxisFormatter.format(new Date(value));
               }
             },
             title: {
               display: true,
-              text: "Detection Time"
+              text: "Detection Time",
+              color: palette.text
             }
           }
         }
@@ -491,6 +723,74 @@ function renderTimelineVisuals() {
   shotTimelineChart.data.datasets[0].data = shotScatterData;
   shotTimelineChart.data.datasets[1].data = trendData;
   shotTimelineChart.update("none");
+
+  if (!hourlyHeatmapChart) {
+    const palette = getChartThemePalette();
+    hourlyHeatmapChart = new Chart(document.getElementById("hourlyHeatmapChart"), {
+      type: "bubble",
+      data: {
+        datasets: []
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          chartThemePlugin: {
+            backgroundColor: palette.chartBg
+          },
+          legend: {
+            display: false
+          },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                return `Detections: ${context.raw.r || 0}`;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            min: 0,
+            max: 7,
+            ticks: {
+              stepSize: 1,
+              color: palette.text,
+              callback(value) {
+                const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                return days[value];
+              }
+            },
+            title: {
+              display: true,
+              text: "Day of Week",
+              color: palette.text
+            },
+            grid: {
+              color: palette.gridStrong
+            }
+          },
+          x: {
+            min: 0,
+            max: 24,
+            ticks: {
+              stepSize: 1,
+              color: palette.text
+            },
+            title: {
+              display: true,
+              text: "Hour of Day",
+              color: palette.text
+            },
+            grid: {
+              color: palette.gridSoft
+            }
+          }
+        }
+      }
+    });
+  }
 }
 
 function setSelectedEventVisualState(key) {
@@ -595,7 +895,15 @@ async function fetchEvents() {
   }
 
   const events = await res.json();
-  allEvents = Array.isArray(events) ? events : [];
+  const newEvents = Array.isArray(events) ? events : [];
+  
+  liveDetectionCount = newEvents.length;
+  if (liveCounterDisplay) {
+    liveCounterDisplay.textContent = liveDetectionCount;
+  }
+
+  allEvents = newEvents;
+  updateMapHeatmap(allEvents);
   processIncomingAlert(allEvents);
 
   const eventList = document.getElementById("eventList");
@@ -610,16 +918,18 @@ async function fetchEvents() {
     const lat = Number(event.latitude);
     const lng = Number(event.longitude);
     const label = toDisplayLabel(event.label);
+    const confidence = Number(event.confidence || 0);
+    const threatClass = getThreatLevel(confidence);
 
     const item = document.createElement("div");
-    item.className = "event-item";
+    item.className = `event-item ${threatClass}`;
     item.dataset.eventKey = eventKey;
     item.setAttribute("role", "button");
     item.tabIndex = 0;
     item.innerHTML = `
       <strong>${label} | ${event.node_id || "unknown-node"}</strong>
       <div>Time: ${new Date(event.received_at).toLocaleString()}</div>
-      <div>Confidence: ${Number(event.confidence || 0).toFixed(2)}</div>
+      <div>Confidence: ${confidence.toFixed(2)}</div>
       <div>Peak: ${Number(event.peak || 0).toFixed(2)}</div>
       <div>Location: ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
     `;
@@ -643,7 +953,7 @@ async function fetchEvents() {
         <b>${label}</b><br/>
         Node: ${event.node_id || "unknown-node"}<br/>
         Time: ${new Date(event.received_at).toLocaleString()}<br/>
-        Confidence: ${Number(event.confidence || 0).toFixed(2)}<br/>
+        Confidence: ${confidence.toFixed(2)}<br/>
         Peak: ${Number(event.peak || 0).toFixed(2)}
       `);
 
@@ -695,13 +1005,118 @@ async function refreshAll() {
     await Promise.all([fetchStats(), fetchEvents()]);
   }
   catch (error) {
-    // eslint-disable-next-line no-console
     console.error("Failed to refresh dashboard:", error);
   }
 }
 
+function exportToCSV() {
+  const headers = ["timestamp", "label", "node_id", "confidence", "peak", "latitude", "longitude"];
+  const rows = allEvents.map((event) => [
+    event.received_at,
+    event.label,
+    event.node_id,
+    event.confidence,
+    event.peak,
+    event.latitude,
+    event.longitude
+  ]);
+
+  const csvContent = [
+    headers.join(","),
+    ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))
+  ].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", `gunshot-detections-${new Date().toISOString().split("T")[0]}.csv`);
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportToPDF() {
+  const JsPdfCtor = window.jsPDF || window.jspdf?.jsPDF;
+  if (typeof JsPdfCtor === "undefined") {
+    alert("PDF export requires jsPDF library. Please add it manually or use CSV export.");
+    return;
+  }
+
+  const doc = new JsPdfCtor();
+  const timestamp = new Date().toLocaleString();
+  const gunshotCount = allEvents.filter((e) => String(e.label || "").toLowerCase().includes("gunshot")).length;
+
+  doc.setFontSize(16);
+  doc.text("Gunshot Detection Report", 10, 10);
+
+  doc.setFontSize(10);
+  doc.text(`Generated: ${timestamp}`, 10, 20);
+  doc.text(`Total Detections: ${allEvents.length}`, 10, 28);
+  doc.text(`Gunshot Detections: ${gunshotCount}`, 10, 36);
+
+  const gunshotEvents = allEvents.filter((e) => String(e.label || "").toLowerCase().includes("gunshot")).slice(-20);
+  let yPos = 45;
+
+  doc.setFontSize(11);
+  doc.text("Recent Gunshot Events:", 10, yPos);
+  yPos += 8;
+
+  doc.setFontSize(8);
+  gunshotEvents.forEach((event) => {
+    const text = `${new Date(event.received_at).toLocaleString()} | ${event.node_id} | Conf: ${Number(event.confidence || 0).toFixed(2)}`;
+    doc.text(text, 10, yPos);
+    yPos += 6;
+    if (yPos > 280) {
+      doc.addPage();
+      yPos = 10;
+    }
+  });
+
+  doc.save(`gunshot-report-${new Date().toISOString().split("T")[0]}.pdf`);
+}
+
 document.getElementById("sendTestBtn").addEventListener("click", sendFakeDetection);
 timelineGranularitySelect.addEventListener("change", renderTimelineVisuals);
+
+if (toggleHourlyHeatmap) {
+  toggleHourlyHeatmap.addEventListener("click", () => {
+    showHourlyHeatmap = !showHourlyHeatmap;
+    const container = document.querySelector(".hourly-heatmap-container");
+    if (showHourlyHeatmap) {
+      container.classList.add("visible");
+      toggleHourlyHeatmap.classList.add("active");
+    }
+    else {
+      container.classList.remove("visible");
+      toggleHourlyHeatmap.classList.remove("active");
+    }
+  });
+}
+
+if (exportPdfBtn) {
+  exportPdfBtn.addEventListener("click", exportToPDF);
+}
+
+if (exportCsvBtn) {
+  exportCsvBtn.addEventListener("click", exportToCSV);
+}
+
+if (toggleMapHeatmapBtn) {
+  toggleMapHeatmapBtn.addEventListener("click", () => {
+    showMapHeatmap = !showMapHeatmap;
+    toggleMapHeatmapBtn.classList.toggle("active", showMapHeatmap);
+    toggleMapHeatmapBtn.textContent = showMapHeatmap ? "Hide map heatmap" : "Show map heatmap";
+
+    if (mapHeatLayer && map) {
+      if (showMapHeatmap && !map.hasLayer(mapHeatLayer)) {
+        map.addLayer(mapHeatLayer);
+      }
+      if (!showMapHeatmap && map.hasLayer(mapHeatLayer)) {
+        map.removeLayer(mapHeatLayer);
+      }
+    }
+  });
+}
 
 if (alertSeeMapBtn) {
   alertSeeMapBtn.addEventListener("click", () => {
@@ -714,8 +1129,10 @@ if (alertSeeMapBtn) {
   });
 }
 
+initThemeToggle();
 initMap();
 refreshAll();
+applyChartTheme();
 
 // Refresh every 5 seconds
 setInterval(refreshAll, 5000);
