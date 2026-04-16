@@ -24,6 +24,10 @@
     <div>
       <h1>Gunshot Detection Command Center</h1>
       <p>LoRaWAN + TTN + XIAO nRF52</p>
+      <div class="status-ribbon" id="statusRibbon" role="status" aria-live="polite">
+        <span class="status-pill" id="riskStateBadge">CALM</span>
+        <span id="riskStateText">Area stable. Monitoring live signal.</span>
+      </div>
     </div>
     <div class="header-controls">
       <button id="themeToggle" class="theme-toggle" title="Toggle dark mode">🌙</button>
@@ -35,6 +39,13 @@
       <div class="webhook-alert-content">
         <span id="webhookAlertText"></span>
         <button id="alertSeeMapBtn" class="alert-see-map-btn" type="button">See on map</button>
+      </div>
+    </section>
+
+    <section class="card live-ticker-card" aria-live="polite" aria-label="Live activity ticker">
+      <div class="live-ticker-label">Live feed</div>
+      <div class="live-ticker" id="liveTicker">
+        <div class="live-ticker-track" id="liveTickerTrack"></div>
       </div>
     </section>
 
@@ -108,6 +119,14 @@
       <div class="card live-counter">
         <h3>Live detections</h3>
         <p id="liveCounter">0</p>
+      </div>
+      <div class="card">
+        <h3>Gunshots in last 10m</h3>
+        <p id="streak10m">0</p>
+      </div>
+      <div class="card">
+        <h3>Hottest node (1h)</h3>
+        <p id="hottestNode">-</p>
       </div>
       <div class="card">
         <h3>Total detections</h3>

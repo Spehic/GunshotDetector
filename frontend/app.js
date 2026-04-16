@@ -4,6 +4,7 @@ const EVENT_LIMIT = 1000;
 let map;
 let markersLayer;
 let selectionLayer;
+let alertFxLayer;
 let selectedHalo;
 let mapHeatLayer;
 let selectedEventKey = null;
@@ -26,6 +27,7 @@ let lastAlertEventKey = null;
 let alertHideTimeout;
 let liveDetectionCount = 0;
 let showMapHeatmap = true;
+let liveTickerEntries = [];
 
 const timelineGranularitySelect = document.getElementById("timelineGranularity");
 const webhookAlert = document.getElementById("webhookAlert");
@@ -38,6 +40,11 @@ const exportCsvBtn = document.getElementById("exportCsvBtn");
 const liveCounterDisplay = document.getElementById("liveCounter");
 const toggleMapHeatmapBtn = document.getElementById("toggleMapHeatmap");
 const mapWindowButtons = Array.from(document.querySelectorAll(".map-window-btn"));
+const liveTickerTrack = document.getElementById("liveTickerTrack");
+const riskStateBadge = document.getElementById("riskStateBadge");
+const riskStateText = document.getElementById("riskStateText");
+const streak10mDisplay = document.getElementById("streak10m");
+const hottestNodeDisplay = document.getElementById("hottestNode");
 
 const shotAxisFormatter = new Intl.DateTimeFormat(undefined, {
   month: "short",
@@ -174,6 +181,7 @@ function initMap() {
 
   markersLayer = L.layerGroup().addTo(map);
   selectionLayer = L.layerGroup().addTo(map);
+  alertFxLayer = L.layerGroup().addTo(map);
 
   if (typeof L.heatLayer === "function") {
     mapHeatLayer = L.heatLayer([], {
@@ -190,6 +198,233 @@ function initMap() {
   }
 
   map.on("click", clearSelectedEvent);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function getRiskState(events) {
+  const now = Date.now();
+  const recentGunshots = events.filter((event) => {
+    const timestamp = toEventTimestamp(event);
+    if (timestamp === null || timestamp < now - (5 * 60 * 1000)) {
+      return false;
+    }
+    return String(event.label || "").toLowerCase().includes("gunshot");
+  });
+
+  if (recentGunshots.length === 0) {
+    return {
+      state: "calm",
+      score: 0,
+      count: 0,
+      avgConfidence: 0
+    };
+  }
+
+  const avgConfidence = recentGunshots.reduce((sum, event) => sum + Number(event.confidence || 0), 0) / recentGunshots.length;
+  const velocityFactor = Math.min(1, recentGunshots.length / 8);
+  const score = (avgConfidence * 0.75) + (velocityFactor * 0.25);
+
+  if (recentGunshots.length >= 6 || score >= 0.82) {
+    return { state: "critical", score, count: recentGunshots.length, avgConfidence };
+  }
+
+  if (recentGunshots.length >= 3 || score >= 0.56) {
+    return { state: "elevated", score, count: recentGunshots.length, avgConfidence };
+  }
+
+  return { state: "calm", score, count: recentGunshots.length, avgConfidence };
+}
+
+function updateRiskMood(events) {
+  const risk = getRiskState(events);
+  document.documentElement.setAttribute("data-risk", risk.state);
+
+  if (riskStateBadge) {
+    riskStateBadge.textContent = risk.state.toUpperCase();
+  }
+
+  if (riskStateText) {
+    if (risk.state === "critical") {
+      riskStateText.textContent = `${risk.count} detections in last 5m. Immediate attention advised.`;
+    }
+    else if (risk.state === "elevated") {
+      riskStateText.textContent = `${risk.count} detections in last 5m. Activity rising.`;
+    }
+    else {
+      riskStateText.textContent = "Area stable. Monitoring live signal.";
+    }
+  }
+}
+
+function updateLiveMetrics(events) {
+  const now = Date.now();
+  const gunshotsLast10m = events.filter((event) => {
+    const timestamp = toEventTimestamp(event);
+    if (timestamp === null || timestamp < now - (10 * 60 * 1000)) {
+      return false;
+    }
+    return String(event.label || "").toLowerCase().includes("gunshot");
+  });
+
+  const nodeCounts = new Map();
+  events.forEach((event) => {
+    const timestamp = toEventTimestamp(event);
+    if (timestamp === null || timestamp < now - (60 * 60 * 1000)) {
+      return;
+    }
+
+    if (!String(event.label || "").toLowerCase().includes("gunshot")) {
+      return;
+    }
+
+    const node = event.node_id || "unknown-node";
+    nodeCounts.set(node, (nodeCounts.get(node) || 0) + 1);
+  });
+
+  let hottestNode = "-";
+  let hottestNodeCount = 0;
+  nodeCounts.forEach((count, node) => {
+    if (count > hottestNodeCount) {
+      hottestNodeCount = count;
+      hottestNode = node;
+    }
+  });
+
+  if (streak10mDisplay) {
+    streak10mDisplay.textContent = String(gunshotsLast10m.length);
+  }
+
+  if (hottestNodeDisplay) {
+    hottestNodeDisplay.textContent = hottestNodeCount > 0 ? `${hottestNode} (${hottestNodeCount})` : "-";
+  }
+}
+
+function upsertTickerEvent(event, eventKey) {
+  if (!event || !eventKey) {
+    return;
+  }
+
+  if (liveTickerEntries.some((entry) => entry.key === eventKey)) {
+    return;
+  }
+
+  liveTickerEntries.unshift({
+    key: eventKey,
+    node: event.node_id || "unknown-node",
+    label: toDisplayLabel(event.label),
+    confidence: Number(event.confidence || 0),
+    time: new Date(event.received_at).toLocaleTimeString()
+  });
+
+  liveTickerEntries = liveTickerEntries.slice(0, 18);
+}
+
+function seedTickerFromEvents(events) {
+  if (liveTickerEntries.length > 0) {
+    return;
+  }
+
+  const latest = [...events]
+    .sort((a, b) => new Date(b.received_at).getTime() - new Date(a.received_at).getTime())
+    .slice(0, 8);
+
+  latest.forEach((event, index) => {
+    const key = buildEventKey(event, index);
+    upsertTickerEvent(event, key);
+  });
+}
+
+function renderLiveTicker() {
+  if (!liveTickerTrack) {
+    return;
+  }
+
+  if (liveTickerEntries.length === 0) {
+    liveTickerTrack.innerHTML = "<span class=\"ticker-item\">Waiting for live detections...</span>";
+    return;
+  }
+
+  const html = liveTickerEntries
+    .map((entry) => `
+      <button class="ticker-item" type="button" data-event-key="${escapeHtml(entry.key)}">
+        ${escapeHtml(entry.node)} | ${escapeHtml(entry.label)} | conf ${entry.confidence.toFixed(2)} | ${escapeHtml(entry.time)}
+      </button>
+    `)
+    .join("");
+
+  liveTickerTrack.innerHTML = `${html}${html}`;
+  liveTickerTrack.style.setProperty("--ticker-duration", `${Math.max(24, liveTickerEntries.length * 4.2)}s`);
+
+  liveTickerTrack.querySelectorAll(".ticker-item").forEach((item) => {
+    item.addEventListener("click", () => {
+      const eventKey = item.dataset.eventKey;
+      if (eventKey) {
+        focusEventByKey(eventKey, true);
+      }
+    });
+  });
+}
+
+function triggerRadarSweep(event) {
+  if (!alertFxLayer || !event) {
+    return;
+  }
+
+  const lat = Number(event.latitude);
+  const lng = Number(event.longitude);
+  if (Number.isNaN(lat) || Number.isNaN(lng) || lat === 0 || lng === 0) {
+    return;
+  }
+
+  const center = L.latLng(lat, lng);
+  const tone = Number(event.confidence || 0) >= 0.85 ? "#ef4444" : "#fb923c";
+
+  const createPulse = (delayMs) => {
+    setTimeout(() => {
+      const pulse = L.circleMarker(center, {
+        radius: 8,
+        color: tone,
+        weight: 2,
+        fillColor: tone,
+        fillOpacity: 0.2,
+        opacity: 0.9,
+        interactive: false
+      }).addTo(alertFxLayer);
+
+      const startTime = performance.now();
+      const durationMs = 1100;
+
+      const animate = (now) => {
+        const elapsed = now - startTime;
+        const progress = Math.min(1, elapsed / durationMs);
+        pulse.setRadius(8 + (42 * progress));
+        pulse.setStyle({
+          opacity: 0.9 * (1 - progress),
+          fillOpacity: 0.2 * (1 - progress)
+        });
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        }
+        else {
+          alertFxLayer.removeLayer(pulse);
+        }
+      };
+
+      requestAnimationFrame(animate);
+    }, delayMs);
+  };
+
+  createPulse(0);
+  createPulse(180);
 }
 
 function updateMapHeatmap(events) {
@@ -622,7 +857,14 @@ function showWebhookAlertForEvent(event, eventKey) {
     alertSeeMapBtn.style.display = lastAlertEventKey ? "inline-flex" : "none";
   }
 
+  webhookAlert.classList.remove("is-shocking");
+  void webhookAlert.offsetWidth;
   webhookAlert.classList.add("is-visible");
+  webhookAlert.classList.add("is-shocking");
+
+  upsertTickerEvent(event, eventKey);
+  renderLiveTicker();
+  triggerRadarSweep(event);
 
   if (alertHideTimeout) {
     clearTimeout(alertHideTimeout);
@@ -630,6 +872,7 @@ function showWebhookAlertForEvent(event, eventKey) {
 
   alertHideTimeout = setTimeout(() => {
     webhookAlert.classList.remove("is-visible");
+    webhookAlert.classList.remove("is-shocking");
   }, 8000);
 }
 
@@ -973,6 +1216,10 @@ async function fetchEvents() {
   }
 
   allEvents = newEvents;
+  seedTickerFromEvents(allEvents);
+  updateLiveMetrics(allEvents);
+  updateRiskMood(allEvents);
+  renderLiveTicker();
   updateMapHeatmap(allEvents);
   processIncomingAlert(allEvents);
 
