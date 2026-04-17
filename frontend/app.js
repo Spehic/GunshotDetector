@@ -1,5 +1,20 @@
 const API_BASE = "https://backend.kbnet.si";
 const EVENT_LIMIT = 1000;
+const SAME_ORIGIN_BASE = window.location.origin;
+const URL_API_BASE_OVERRIDE = new URLSearchParams(window.location.search).get("apiBase");
+const RUNTIME_API_BASE = (typeof window.GUNSHOT_API_BASE === "string" && window.GUNSHOT_API_BASE.trim())
+  || (typeof URL_API_BASE_OVERRIDE === "string" && URL_API_BASE_OVERRIDE.trim())
+  || "";
+
+const API_BASE_CANDIDATES = Array.from(
+  new Set([
+    RUNTIME_API_BASE,
+    API_BASE,
+    SAME_ORIGIN_BASE
+  ].filter(Boolean))
+);
+
+let activeApiBase = API_BASE_CANDIDATES[0] || "";
 
 let map;
 let markersLayer;
@@ -45,6 +60,46 @@ const riskStateBadge = document.getElementById("riskStateBadge");
 const riskStateText = document.getElementById("riskStateText");
 const streak10mDisplay = document.getElementById("streak10m");
 const hottestNodeDisplay = document.getElementById("hottestNode");
+
+function normalizeBase(base) {
+  return String(base || "").replace(/\/+$/, "");
+}
+
+function buildApiUrl(base, path) {
+  const normalizedBase = normalizeBase(base);
+  const normalizedPath = String(path || "").startsWith("/") ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}`;
+}
+
+async function fetchFromApi(path, options) {
+  const preferred = activeApiBase;
+  const candidates = preferred
+    ? [preferred, ...API_BASE_CANDIDATES.filter((base) => base !== preferred)]
+    : [...API_BASE_CANDIDATES];
+
+  const failures = [];
+
+  for (const base of candidates) {
+    try {
+      const response = await fetch(buildApiUrl(base, path), options);
+      if (!response.ok) {
+        throw new Error(`${path} failed on ${base} (${response.status})`);
+      }
+
+      if (base !== activeApiBase) {
+        console.info(`Switched API base to ${base}`);
+      }
+
+      activeApiBase = base;
+      return response;
+    }
+    catch (error) {
+      failures.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  throw new Error(`All API bases failed for ${path}: ${failures.join(" | ")}`);
+}
 
 const shotAxisFormatter = new Intl.DateTimeFormat(undefined, {
   month: "short",
@@ -1168,10 +1223,7 @@ function focusEventByKey(eventKey, zoomToLocation = true) {
 }
 
 async function fetchStats() {
-  const res = await fetch(`${API_BASE}/api/stats`);
-  if (!res.ok) {
-    throw new Error(`Stats request failed (${res.status})`);
-  }
+  const res = await fetchFromApi("/api/stats");
 
   const data = await res.json();
 
@@ -1202,10 +1254,7 @@ async function fetchStats() {
 }
 
 async function fetchEvents() {
-  const res = await fetch(`${API_BASE}/api/events?limit=${EVENT_LIMIT}`);
-  if (!res.ok) {
-    throw new Error(`Events request failed (${res.status})`);
-  }
+  const res = await fetchFromApi(`/api/events?limit=${EVENT_LIMIT}`);
 
   const events = await res.json();
   const newEvents = Array.isArray(events) ? events : [];
@@ -1308,7 +1357,7 @@ async function fetchEvents() {
 async function sendFakeDetection() {
   const randomConfidence = Number((0.55 + Math.random() * 0.44).toFixed(2));
 
-  await fetch(`${API_BASE}/api/test-event`, {
+  await fetchFromApi("/api/test-event", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -1327,11 +1376,14 @@ async function sendFakeDetection() {
 }
 
 async function refreshAll() {
-  try {
-    await Promise.all([fetchStats(), fetchEvents()]);
+  const [statsResult, eventsResult] = await Promise.allSettled([fetchStats(), fetchEvents()]);
+
+  if (statsResult.status === "rejected") {
+    console.error("Failed to refresh stats:", statsResult.reason);
   }
-  catch (error) {
-    console.error("Failed to refresh dashboard:", error);
+
+  if (eventsResult.status === "rejected") {
+    console.error("Failed to refresh events:", eventsResult.reason);
   }
 }
 
