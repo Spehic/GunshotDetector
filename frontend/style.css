@@ -240,8 +240,17 @@ main {
   content: "";
   position: absolute;
   inset: 0;
+  border-radius: inherit;
   pointer-events: none;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.45), transparent 8%, transparent 92%, rgba(255, 255, 255, 0.45));
+  background:
+    radial-gradient(120% 180% at 50% 50%, transparent 60%, rgba(255, 255, 255, 0.08) 100%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent 12%, transparent 88%, rgba(255, 255, 255, 0.08));
+}
+
+[data-theme="dark"] .live-ticker::after {
+  background:
+    radial-gradient(120% 180% at 50% 50%, transparent 58%, rgba(148, 163, 184, 0.08) 100%),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06), transparent 12%, transparent 88%, rgba(148, 163, 184, 0.06));
 }
 
 .live-ticker-track {
