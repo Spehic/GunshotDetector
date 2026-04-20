@@ -8,7 +8,7 @@ const char* DEVEUI = "70B3D57ED0076774";
 const char* APPKEY = "7879060DB75D2CA6F1147E14EA846886";
 
 const char* TARGET_LABEL  = "gunshot";
-const float MIN_CONFIDENCE = 0.85f;
+const float MIN_CONFIDENCE = 0.15f;
 
 // --------- Audio + Inference Buffers ---------
 typedef struct {
@@ -36,9 +36,9 @@ void setup() {
   Serial1.begin(9600); 
   while (!Serial1);
 
-  Serial.println("--- Booting: Fresh Session ---");
+  Serial.println("--- System Online ---");
   
-  // 1. Reset and Configure LoRa
+  // LoRa Configuration
   Serial1.println("AT+RESET"); 
   delay(2000);
   Serial1.print("AT+ID=AppEui,\""); Serial1.print(APPEUI); Serial1.println("\"");
@@ -52,25 +52,18 @@ void setup() {
   Serial1.println("AT+DR=DR0");
   delay(500);
   
-  // 2. The Join
-  Serial.println("Joining TTN...");
+  Serial.println("Connecting to LoRaWAN...");
   Serial1.println("AT+JOIN");
-  
-  // 20 second wait for stable handshake
   delay(20000); 
 
-  // 3. STARTUP CONNECTIVITY TEST
-  Serial.println("Sending Test Uplink...");
-  Serial1.println("AT+MSG=\"HELLO_TTN\""); 
+  Serial1.println("AT+MSG=\"S1_READY\""); 
   delay(5000); 
 
-  // 4. Start Microphone
   if (!microphone_inference_start(EI_CLASSIFIER_RAW_SAMPLE_COUNT)) {
-    Serial.println("Mic Error");
+    Serial.println("Mic Error!");
     while (1); 
   }
-
-  Serial.println("System Running.");
+  Serial.println("Listening for gunshots...");
 }
 
 void loop() {
@@ -85,20 +78,28 @@ void loop() {
     for (size_t i = 0; i < EI_CLASSIFIER_LABEL_COUNT; i++) {
       if (strcmp(result.classification[i].label, TARGET_LABEL) == 0) {
         if (result.classification[i].value >= MIN_CONFIDENCE) {
-          Serial.println("!!! GUNSHOT !!!");
           
-          char payload[64];
-          snprintf(payload, sizeof(payload), "AT+MSG=\"shot|%.2f\"", result.classification[i].value);
+          // --- SERIAL MONITOR ALERT ---
+          Serial.println("\n******************************");
+          Serial.println("* GUNSHOT DETECTED      *");
+          Serial.print("* Confidence: "); 
+          Serial.print(result.classification[i].value);
+          Serial.println("      *");
+          Serial.println("******************************\n");
+          
+          // Send to LoRa
+          char payload[40];
+          snprintf(payload, sizeof(payload), "AT+MSG=\"s1,gs,%.2f\"", result.classification[i].value);
           Serial1.println(payload);
           
-          delay(10000); 
+          delay(7000); // Cooldown to avoid multi-triggering
         }
       }
     }
   }
 }
 
-// --------- Support Functions ---------
+// --------- Support Functions (PDM Microphone) ---------
 
 static void pdm_data_ready_inference_callback(void) {
   int avail = PDM.available();
@@ -118,16 +119,11 @@ static void pdm_data_ready_inference_callback(void) {
 static bool microphone_inference_start(uint32_t n_samples) {
   inference.buffer = (int16_t*)malloc(n_samples * sizeof(int16_t));
   if (!inference.buffer) return false;
-  
   inference.n_samples = n_samples;
   inference.buf_ready = 0;
   inference.buf_count = 0;
-
   PDM.onReceive(&pdm_data_ready_inference_callback);
-  if (!PDM.begin(1, 16000)) {
-    free(inference.buffer);
-    return false;
-  }
+  if (!PDM.begin(1, 16000)) return false;
   PDM.setGain(40);
   return true;
 }
