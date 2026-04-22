@@ -71,6 +71,30 @@ function buildApiUrl(base, path) {
   return `${normalizedBase}${normalizedPath}`;
 }
 
+function createDetectionClusterLayer() {
+  if (typeof L.markerClusterGroup !== "function") {
+    return L.layerGroup();
+  }
+
+  return L.markerClusterGroup({
+    chunkedLoading: true,
+    showCoverageOnHover: false,
+    spiderfyOnMaxZoom: true,
+    disableClusteringAtZoom: 17,
+    maxClusterRadius: 56,
+    iconCreateFunction(cluster) {
+      const count = cluster.getChildCount();
+      const toneClass = count < 3 ? "low" : count < 6 ? "mid" : count < 10 ? "high" : "critical";
+
+      return L.divIcon({
+        html: `<div class="cluster-badge"><span class="cluster-count">${count}</span></div>`,
+        className: `detection-cluster detection-cluster-${toneClass}`,
+        iconSize: L.point(48, 48)
+      });
+    }
+  });
+}
+
 async function fetchFromApi(path, options) {
   const preferred = activeApiBase;
   const candidates = preferred
@@ -234,7 +258,7 @@ function initMap() {
     attribution: "&copy; OpenStreetMap contributors"
   }).addTo(map);
 
-  markersLayer = L.layerGroup().addTo(map);
+  markersLayer = createDetectionClusterLayer().addTo(map);
   selectionLayer = L.layerGroup().addTo(map);
   alertFxLayer = L.layerGroup().addTo(map);
 
@@ -1218,8 +1242,17 @@ function focusEventByKey(eventKey, zoomToLocation = true) {
     interactive: false
   }).addTo(selectionLayer);
 
-  marker.openPopup();
-  setSelectedEventVisualState(eventKey);
+  const openMarkerPopup = () => {
+    marker.openPopup();
+    setSelectedEventVisualState(eventKey);
+  };
+
+  if (zoomToLocation && markersLayer && typeof markersLayer.zoomToShowLayer === "function") {
+    markersLayer.zoomToShowLayer(marker, openMarkerPopup);
+    return;
+  }
+
+  openMarkerPopup();
 }
 
 async function fetchStats() {
@@ -1318,7 +1351,9 @@ async function fetchEvents() {
 
     const shouldRenderOnMap = isEventInMapWindow(event) || eventKey === selectedEventKey;
     if (shouldRenderOnMap && !Number.isNaN(lat) && !Number.isNaN(lng) && lat !== 0 && lng !== 0) {
-      const marker = L.marker([lat, lng]).addTo(markersLayer);
+      const marker = L.marker([lat, lng], {
+        title: `${label} | ${event.node_id || "unknown-node"}`
+      }).addTo(markersLayer);
       marker.bindPopup(`
         <b>${label}</b><br/>
         Node: ${event.node_id || "unknown-node"}<br/>
