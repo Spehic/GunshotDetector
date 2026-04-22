@@ -520,20 +520,14 @@ main {
   text-shadow: 0 1px 2px rgba(15, 23, 42, 0.25);
 }
 
-.detection-cluster-small {
-  z-index: 1;
-}
-
-.detection-cluster-small .cluster-badge {
-  background: linear-gradient(180deg, #5da5ff 0%, #2f7ef7 100%);
-}
-
 .detection-cluster-low .cluster-badge {
-  background: linear-gradient(180deg, #5da5ff 0%, #2f7ef7 100%);
+  background: linear-gradient(180deg, #34d399 0%, #059669 100%);
 }
 
 .detection-cluster-mid .cluster-badge {
-  background: linear-gradient(180deg, #4f97fb 0%, #2563eb 100%);
+  background: linear-gradient(180deg, #facc15 0%, #eab308 100%);
+  color: #1f2937;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.25);
 }
 
 .detection-cluster-high .cluster-badge {
@@ -544,40 +538,18 @@ main {
   background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
 }
 
-.detection-cluster-medium {
-  z-index: 2;
-}
-
-.detection-cluster-medium .cluster-badge {
-  background: linear-gradient(180deg, #4f97fb 0%, #2368de 100%);
-}
-
-.detection-cluster-large {
-  z-index: 3;
-}
-
-.detection-cluster-large .cluster-badge {
-  background: linear-gradient(180deg, #2f80ff 0%, #1557c3 100%);
-}
-
 [data-theme="dark"] .detection-cluster {
   filter: saturate(0.95) brightness(0.98);
 }
 
-[data-theme="dark"] .detection-cluster-small {
-  z-index: 1;
-}
-
-[data-theme="dark"] .detection-cluster-small .cluster-badge {
-  background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
-}
-
 [data-theme="dark"] .detection-cluster-low .cluster-badge {
-  background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+  background: linear-gradient(180deg, #34d399 0%, #047857 100%);
 }
 
 [data-theme="dark"] .detection-cluster-mid .cluster-badge {
-  background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+  background: linear-gradient(180deg, #facc15 0%, #ca8a04 100%);
+  color: #111827;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.18);
 }
 
 [data-theme="dark"] .detection-cluster-high .cluster-badge {
@@ -586,22 +558,6 @@ main {
 
 [data-theme="dark"] .detection-cluster-critical .cluster-badge {
   background: linear-gradient(180deg, #fb7185 0%, #be123c 100%);
-}
-
-[data-theme="dark"] .detection-cluster-medium {
-  z-index: 2;
-}
-
-[data-theme="dark"] .detection-cluster-medium .cluster-badge {
-  background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
-}
-
-[data-theme="dark"] .detection-cluster-large {
-  z-index: 3;
-}
-
-[data-theme="dark"] .detection-cluster-large .cluster-badge {
-  background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%);
 }
 
 .side-card {

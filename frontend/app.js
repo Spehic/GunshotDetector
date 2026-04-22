@@ -84,12 +84,11 @@ function createDetectionClusterLayer() {
     maxClusterRadius: 56,
     iconCreateFunction(cluster) {
       const count = cluster.getChildCount();
-      const sizeClass = count < 10 ? "small" : count < 100 ? "medium" : "large";
       const toneClass = count < 3 ? "low" : count < 6 ? "mid" : count < 10 ? "high" : "critical";
 
       return L.divIcon({
         html: `<div class="cluster-badge"><span class="cluster-count">${count}</span></div>`,
-        className: `detection-cluster detection-cluster-${sizeClass} detection-cluster-${toneClass}`,
+        className: `detection-cluster detection-cluster-${toneClass}`,
         iconSize: L.point(48, 48)
       });
     }
