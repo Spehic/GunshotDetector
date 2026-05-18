@@ -565,6 +565,43 @@ main {
   overflow: auto;
 }
 
+.side-card {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.7) rgba(30, 41, 59, 0.55);
+}
+
+.side-card::-webkit-scrollbar {
+  width: 10px;
+}
+
+.side-card::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.45);
+  border-radius: 999px;
+}
+
+.side-card::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.72);
+  border-radius: 999px;
+  border: 2px solid rgba(30, 41, 59, 0.45);
+}
+
+.side-card::-webkit-scrollbar-thumb:hover {
+  background: rgba(203, 213, 225, 0.85);
+}
+
+[data-theme="light"] .side-card {
+  scrollbar-color: rgba(148, 163, 184, 0.85) rgba(241, 245, 249, 0.9);
+}
+
+[data-theme="light"] .side-card::-webkit-scrollbar-track {
+  background: rgba(241, 245, 249, 0.9);
+}
+
+[data-theme="light"] .side-card::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.9);
+  border-color: rgba(241, 245, 249, 0.9);
+}
+
 .event-list {
   display: flex;
   flex-direction: column;
