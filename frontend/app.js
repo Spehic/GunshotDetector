@@ -40,7 +40,6 @@ let lastSeenEventTime = 0;
 let lastSeenEventSignature = null;
 let lastAlertEventKey = null;
 let alertHideTimeout;
-let liveDetectionCount = 0;
 let showMapHeatmap = true;
 let liveTickerEntries = [];
 
@@ -52,7 +51,6 @@ const themeToggle = document.getElementById("themeToggle");
 const toggleHourlyHeatmap = document.getElementById("toggleHourlyHeatmap");
 const exportPdfBtn = document.getElementById("exportPdfBtn");
 const exportCsvBtn = document.getElementById("exportCsvBtn");
-const liveCounterDisplay = document.getElementById("liveCounter");
 const toggleMapHeatmapBtn = document.getElementById("toggleMapHeatmap");
 const mapWindowButtons = Array.from(document.querySelectorAll(".map-window-btn"));
 const liveTickerTrack = document.getElementById("liveTickerTrack");
@@ -1292,10 +1290,7 @@ async function fetchEvents() {
   const events = await res.json();
   const newEvents = Array.isArray(events) ? events : [];
   
-  liveDetectionCount = newEvents.length;
-  if (liveCounterDisplay) {
-    liveCounterDisplay.textContent = liveDetectionCount;
-  }
+  // live detection count removed — show total detections instead
 
   allEvents = newEvents;
   seedTickerFromEvents(allEvents);
